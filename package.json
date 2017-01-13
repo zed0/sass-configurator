@@ -1,0 +1,15 @@
+{
+  "name": "sass-configurator",
+  "version": "0.0.1",
+  "description": "Live Sass configuration",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "bootstrap-sass": "^3.3.7",
+    "sass.js": "^0.10.3"
+  }
+}
