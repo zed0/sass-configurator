@@ -85,15 +85,9 @@ var files = [
 var editor;
 var variables = {};
 
-$(document).ready(function() {
-	sass = new Sass(workerPath);
-	sass.preloadFiles(base, directory, files, function callback() {
-		sass.readFile('bootstrap/_variables.scss', function(content) {
-			editor.getSession().setValue(content);
-			parseCode();
-		});
-	});
+var modifyVariable = _.debounce(_modifyVariable, 2000, {leading: true, trailing: true});
 
+$(document).ready(function() {
 	editor = ace.edit('editor');
 	editor.setTheme('ace/theme/chrome');
 	editor.getSession().setMode('ace/mode/scss');
@@ -101,24 +95,36 @@ $(document).ready(function() {
 	editor.getSession().setTabSize(2);
 	editor.getSession().setUseWrapMode(false);
 	editor.$blockScrolling = Infinity;
-	editor.getSession().on('change', _.throttle(update, 2000));
 
+	sass = new Sass(workerPath);
+	sass.options({indentedSyntax: false});
+	sass.preloadFiles(base, directory, files, function callback() {
+		sass.readFile('bootstrap/_variables.scss', function(content) {
+			editor.getSession().setValue(content);
+			update();
+			parseCode();
+			editor.getSession().on('change', _.throttle(update, 2000));
+		});
+	});
+
+	$('#test').on('click', function(){compileVariable('$gray', 'gray', function(result){console.log(result)});});
 	$('#update_button').on('click', _.throttle(update, 2000));
 	$('#editor_button').on('click', showEditor);
 	$('#easy_mode_button').on('click', showEasyMode);
 });
 
-function update() {
+function update(input) {
 	var code = editor.getSession().getValue();
 	sass.writeFile('bootstrap/_variables.scss', code, function(success) {
 		if(!success) {
-			console.err('failed to write bootstrap/_variables.scss');
+			console.error('failed to write bootstrap/_variables.scss');
 			return;
 		}
 
 		sass.compileFile('_bootstrap.scss', function(result) {
 			if(result.status === 0) {
 				window.frames['preview'].contentDocument.getElementById('compiled_sass').innerHTML = result.text;
+				postUpdate();
 			}
 			// TODO: Error highlighting?
 		});
@@ -182,8 +188,17 @@ function parseCode() {
 				'	<label for="' + makeId(variable.name) + '" class="control-label">\n' +
 				'		$' + variable.name + '\n' +
 				'	</label>\n' +
-				'	<input id="' + makeId(variable.name) + '" value="' + variable.value + '" data-varname="' + variable.name + '" type="text" class="form-control">\n' +
-				(state.variableComment ? '<span class="help-block">' + state.variableComment + '</span>\n' : '') +
+				'	<div id="' + makeId(variable.name) + '-color" class="input-group colorpicker-component" data-varname="' + variable.name + '">' +
+				'		<span class="input-group-addon" id="' + makeId(variable.name) + '-compiled">' +
+				'			<i class="fa fa-magic"></i>' +
+				'		</span>' +
+				'		<span class="input-group-addon color-swatch" style="display: none;">' +
+				'			<i></i>' +
+				'		</span>' +
+				'		<input type="hidden" id="' + makeId(variable.name) + '-color-input" class="color-input">\n' +
+				'		<input id="' + makeId(variable.name) + '" value="' + variable.value + '" data-varname="' + variable.name + '" type="text" class="form-control">\n' +
+				'	</div>' +
+				'	' + (state.variableComment ? '<span class="help-block">' + state.variableComment + '</span>\n' : '') +
 				'</div>\n'
 			);
 			state.variableComment = null;
@@ -194,7 +209,26 @@ function parseCode() {
 	$('#easy_mode').html(html.join('\n'));
 
 	_.each(variables, function(variable) {
-		$('#' + makeId(variable.name)).change(modifyVariable);
+		$('#' + makeId(variable.name)).change(updateInput);
+	});
+}
+
+function postUpdate() {
+	_.each(variables, function(variable) {
+		compileVariable(variable.value, variable.name, function(result) {
+			$('#' + makeId(variable.name) + '-compiled').attr('title', result);
+			if(isColor(result)) {
+				var colorPicker = $('#' + makeId(variable.name) + '-color');
+				colorPicker.find('.color-swatch').show();
+				colorPicker.colorpicker({
+					component: '.color-swatch',
+					input:     '.color-input',
+					align:     'left',
+					color:     result,
+				})
+				.on('changeColor', updateColor);
+			}
+		});
 	});
 }
 
@@ -202,10 +236,20 @@ function makeId(variableName) {
 	return 'var-' + variableName;
 }
 
-function modifyVariable(input) {
+function updateColor(e) {
+	var value = e.color.toString('hex');
+	var variable = variables[$(e.target).data('varname')];
+	$('#' + makeId(variable.name)).val(value);
+	modifyVariable(value, variable);
+}
+
+function updateInput() {
 	var value = $(this).val();
 	var variable = variables[$(this).data('varname')];
+	modifyVariable(value, variable);
+}
 
+function _modifyVariable(value, variable) {
 	variable.value = value;
 
 	var codeLines = editor.getSession().getValue().split('\n');
@@ -214,4 +258,42 @@ function modifyVariable(input) {
 	editor.getSession().setValue(codeLines.join('\n'));
 
 	update();
+}
+
+function compileVariable(value, name, callback) {
+	var variableTest = '@import "bootstrap/variables"; test-element{test-property: ' + value + ';}';
+	sass.compile(variableTest, function(result) {
+		if(result.status !== 0) {
+			console.error('could not compile variable: ' + result.message);
+			return;
+		}
+
+		var matches = result.text.match(/test-property: (.*);/);
+		callback(matches[1]);
+	});
+}
+
+function isColor(value) {
+	if(value === '')
+		return false;
+	if(value === 'inherit')
+		return false;
+	if(value === 'transparent')
+		return false;
+
+	var elem = document.createElement('span');
+
+	elem.style.color = 'rgb(0, 0, 0)';
+	elem.style.color = value;
+
+	if(elem.style.color !== 'rgb(0, 0, 0)')
+		return true;
+
+	elem.style.color = 'rgb(255, 255, 255)';
+	elem.style.color = value;
+
+	if(elem.style.color !== 'rgb(255, 255, 255)')
+		return true;
+
+	return false;
 }

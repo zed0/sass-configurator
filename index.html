@@ -11,6 +11,9 @@
 		<!-- installed via npm: -->
 		<script src="node_modules/sass.js/dist/sass.js"></script>
 		<script src="node_modules/marked/lib/marked.js"></script>
+		<script src="node_modules/bootstrap-colorpicker/dist/js/bootstrap-colorpicker.min.js"></script>
+		<link rel="stylesheet" href="node_modules/bootstrap-colorpicker/dist/css/bootstrap-colorpicker.min.css"></script>
+
 		<script src="main.js"></script>
 
 		<style type="text/css">
@@ -27,6 +30,12 @@
 				</div>
 				<div class="navbar-form">
 					<span class="navbar-right">
+						<button
+							class="btn btn-default"
+							id="test"
+						>
+							<i class="fa fa-th-list fa-fw"></i> Test
+						</button>
 						<button
 							class="btn btn-default"
 							id="easy_mode_button"
@@ -61,6 +70,7 @@
 				<div
 					id="easy_mode_container"
 					class="col-sm-6"
+					style="position: fixed; overflow: auto; height: 100%;"
 				>
 					<form
 						id="easy_mode"
