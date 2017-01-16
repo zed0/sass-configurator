@@ -10,6 +10,7 @@
   "license": "MIT",
   "dependencies": {
     "bootstrap-sass": "^3.3.7",
+    "marked": "^0.3.6",
     "sass.js": "^0.10.3"
   }
 }

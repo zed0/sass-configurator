@@ -7,7 +7,10 @@
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.10.1/lodash.min.js"></script>
 		<script src="https://ajaxorg.github.io/ace-builds/src-min-noconflict/ace.js"></script>
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+
+		<!-- installed via npm: -->
 		<script src="node_modules/sass.js/dist/sass.js"></script>
+		<script src="node_modules/marked/lib/marked.js"></script>
 		<script src="main.js"></script>
 
 		<style type="text/css">
@@ -24,17 +27,28 @@
 				</div>
 				<div class="navbar-form">
 					<span class="navbar-right">
-						<span id="version">
-						</span>
+						<button
+							class="btn btn-default"
+							id="easy_mode_button"
+						>
+							<i class="fa fa-th-list fa-fw"></i> Easy mode
+						</button>
+						<button
+							class="btn btn-default"
+							id="editor_button"
+						>
+							<i class="fa fa-file-code-o fa-fw"></i> Editor
+						</button>
 						<button
 							class="btn btn-default"
 							id="update_button"
+							title="The page should automatically update when you make changes.  If it doesn't you can click here."
 						>
-							<i class="fa fa-refresh fa-fw"></i> Update!
+							<i class="fa fa-refresh fa-fw"></i> Update
 						</button>
 						<a
 							class="btn btn-default"
-							href="http://github.com/zed0/sass-configurator"
+							href="https://github.com/zed0/sass-configurator"
 						>
 							<i class="fa fa-github fa-fw"></i> Contribute
 						</a>
@@ -44,13 +58,37 @@
 		</nav>
 		<div class="container-fluid">
 			<div class="row">
-				<div class="col-sm-6" style="padding: 0; margin: 0;">
-					<!--<textarea id="variables_edit" style="height: 100%; width: 100%; resize: none; border: none; spellcheck: false;"></textarea>
-					-->
-					<div id="code" style="height: 100%"></div>
+				<div
+					id="easy_mode_container"
+					class="col-sm-6"
+				>
+					<form
+						id="easy_mode"
+						class="form-horizontal"
+					>
+					</form>
 				</div>
-				<div class="col-sm-6" style="position: absolute; right: 0; bottom: 0; top: 51px; padding: 0;">
-					<iframe id="preview" src="bootstrap_preview.html" style="height: 100%; width: 100%;" frameborder="0">
+				<div
+					id="editor_container"
+					class="col-sm-6"
+					style="padding: 0; margin: 0; display: none;"
+				>
+					<div
+						id="editor"
+						style="height: 100%"
+					>
+					</div>
+				</div>
+				<div
+					class="col-sm-6"
+					style="position: fixed; right: 0; bottom: 0; top: 51px; padding: 0;"
+				>
+					<iframe
+						id="preview"
+						src="bootstrap_preview.html"
+						style="height: 100%; width: 100%;"
+						frameborder="0"
+					/>
 				</div>
 			</div>
 		</div>

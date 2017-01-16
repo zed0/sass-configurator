@@ -82,31 +82,35 @@ var files = [
 	'bootstrap/mixins/_vendor-prefixes.scss',
 ];
 
-var code;
+var editor;
+var variables = {};
 
 $(document).ready(function() {
 	sass = new Sass(workerPath);
 	sass.preloadFiles(base, directory, files, function callback() {
 		sass.readFile('bootstrap/_variables.scss', function(content) {
-			code.getSession().setValue(content);
+			editor.getSession().setValue(content);
+			parseCode();
 		});
 	});
 
-	code = ace.edit('code');
-	code.setTheme('ace/theme/chrome');
-	code.getSession().setMode('ace/mode/scss');
-	code.getSession().setUseSoftTabs(false);
-	code.getSession().setTabSize(2);
-	code.getSession().setUseWrapMode(false);
-	code.$blockScrolling = Infinity;
-	code.getSession().on('change', _.throttle(update, 2000));
+	editor = ace.edit('editor');
+	editor.setTheme('ace/theme/chrome');
+	editor.getSession().setMode('ace/mode/scss');
+	editor.getSession().setUseSoftTabs(false);
+	editor.getSession().setTabSize(2);
+	editor.getSession().setUseWrapMode(false);
+	editor.$blockScrolling = Infinity;
+	editor.getSession().on('change', _.throttle(update, 2000));
 
 	$('#update_button').on('click', _.throttle(update, 2000));
+	$('#editor_button').on('click', showEditor);
+	$('#easy_mode_button').on('click', showEasyMode);
 });
 
 function update() {
-	var variables = code.getSession().getValue();
-	sass.writeFile('bootstrap/_variables.scss', variables, function(success) {
+	var code = editor.getSession().getValue();
+	sass.writeFile('bootstrap/_variables.scss', code, function(success) {
 		if(!success) {
 			console.err('failed to write bootstrap/_variables.scss');
 			return;
@@ -114,10 +118,100 @@ function update() {
 
 		sass.compileFile('_bootstrap.scss', function(result) {
 			if(result.status === 0) {
-				console.log(result);
 				window.frames['preview'].contentDocument.getElementById('compiled_sass').innerHTML = result.text;
 			}
 			// TODO: Error highlighting?
 		});
 	});
+}
+
+function showEditor() {
+	$('#easy_mode_container').hide();
+	$('#editor_container').show();
+}
+
+function showEasyMode() {
+	$('#editor_container').hide();
+	$('#easy_mode_container').show();
+	parseCode();
+}
+
+function parseCode() {
+	var code = editor.getSession().getValue();
+
+	var state = {
+		ignoring: false,
+		variableComment: null,
+	};
+
+	var html = [];
+	_(code)
+	.split('\n')
+	.each(function(line, lineNo) {
+		var match;
+		if(match = line.match(/^\/\/== (.*$)/)) {
+			state.ignoring = false;
+			html.push(marked('# ' + match[1]));
+		}
+		else if(state.ignoring) {
+			return;
+		}
+		else if(match = line.match(/^\/\/=== (.*$)/)) {
+			html.push(marked('## ' + match[1]));
+		}
+		else if(match = line.match(/^\/\/## (.*$)/)) {
+			html.push(marked(match[1]));
+		}
+		else if(match = line.match(/^\/\/\*\* (.*$)/)) {
+			state.variableComment = marked(match[1]);
+		}
+		else if(match = line.match(/^(\$([^:]+):(\s*))([^;]*)( !default;)/)) {
+			var variable = {
+				lineNo:    lineNo,
+				lineStart: match[1],
+				name:      match[2],
+				spacing:   match[3],
+				value:     match[4],
+				lineEnd:   match[5],
+			};
+
+			variables[match[2]] = variable;
+
+			html.push(
+				'<div class="form-group">\n' +
+				'	<label for="' + makeId(variable.name) + '" class="control-label">\n' +
+				'		$' + variable.name + '\n' +
+				'	</label>\n' +
+				'	<input id="' + makeId(variable.name) + '" value="' + variable.value + '" data-varname="' + variable.name + '" type="text" class="form-control">\n' +
+				(state.variableComment ? '<span class="help-block">' + state.variableComment + '</span>\n' : '') +
+				'</div>\n'
+			);
+			state.variableComment = null;
+		}
+	})
+	.value();
+
+	$('#easy_mode').html(html.join('\n'));
+
+	_.each(variables, function(variable) {
+		$('#' + makeId(variable.name)).change(modifyVariable);
+	});
+}
+
+function makeId(variableName) {
+	return 'var-' + variableName;
+}
+
+function modifyVariable(input) {
+	var value = $(this).val();
+	var variable = variables[$(this).data('varname')];
+
+	variable.value = value;
+
+	var codeLines = editor.getSession().getValue().split('\n');
+	codeLines[variable.lineNo] = variable.lineStart + variable.value + variable.lineEnd;
+
+	editor.getSession().setValue(codeLines.join('\n'));
+
+	update();
 }
