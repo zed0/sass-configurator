@@ -20,6 +20,13 @@
 			body {
 				padding-top: 51px;
 			}
+			.colorpicker-element .input-group-addon i {
+				height: 25px;
+				width: 25px;
+				border-radius: 3px;
+				border: 1px solid #ccc;
+				margin: -5px -8px;
+			}
 		</style>
 	</head>
 	<body>
@@ -30,12 +37,6 @@
 				</div>
 				<div class="navbar-form">
 					<span class="navbar-right">
-						<button
-							class="btn btn-default"
-							id="test"
-						>
-							<i class="fa fa-th-list fa-fw"></i> Test
-						</button>
 						<button
 							class="btn btn-default"
 							id="easy_mode_button"
@@ -70,11 +71,10 @@
 				<div
 					id="easy_mode_container"
 					class="col-sm-6"
-					style="position: fixed; overflow: auto; height: 100%;"
+					style="position: fixed; overflow: auto; left: 0; bottom: 0; top: 51px; "
 				>
 					<form
 						id="easy_mode"
-						class="form-horizontal"
 					>
 					</form>
 				</div>

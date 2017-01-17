@@ -107,7 +107,6 @@ $(document).ready(function() {
 		});
 	});
 
-	$('#test').on('click', function(){compileVariable('$gray', 'gray', function(result){console.log(result)});});
 	$('#update_button').on('click', _.throttle(update, 2000));
 	$('#editor_button').on('click', showEditor);
 	$('#easy_mode_button').on('click', showEasyMode);
@@ -190,7 +189,7 @@ function parseCode() {
 				'	</label>\n' +
 				'	<div id="' + makeId(variable.name) + '-color" class="input-group colorpicker-component" data-varname="' + variable.name + '">' +
 				'		<span class="input-group-addon" id="' + makeId(variable.name) + '-compiled">' +
-				'			<i class="fa fa-magic"></i>' +
+				'			<span class="fa fa-magic"></span>' +
 				'		</span>' +
 				'		<span class="input-group-addon color-swatch" style="display: none;">' +
 				'			<i></i>' +
