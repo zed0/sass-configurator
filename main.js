@@ -219,21 +219,22 @@ function parseCode() {
 }
 
 function postUpdate() {
-	_.each(variables, function(variable) {
-		compileVariable(variable.value, variable.name, function(result) {
-			$('#' + makeId(variable.name) + '-compiled').attr('title', result);
-			if(isColor(result)) {
-				var colorPicker = $('#' + makeId(variable.name) + '-color');
+	compileVariables(variables, function(results) {
+		_.each(results, function(compiled, name) {
+			$('#' + makeId(name) + '-compiled').attr('title', compiled);
+			if(isColor(compiled)) {
+				var colorPicker = $('#' + makeId(name) + '-color');
 				colorPicker.find('.color-swatch').show();
 				colorPicker.colorpicker({
 					component: '.color-swatch',
 					input:     '.color-input',
 					align:     'left',
-					color:     result,
+					color:     compiled,
 				})
 				.on('changeColor', updateColor);
 			}
 		});
+
 	});
 }
 
@@ -265,17 +266,24 @@ function _modifyVariable(value, variable) {
 	update();
 }
 
-function compileVariable(value, name, callback) {
-	var variableTest = '@import "bootstrap/variables"; test-element{test-property: ' + value + ';}';
+function compileVariables(variableList, callback) {
+	results = {};
+	var variableTest = '@import "bootstrap/variables";\n';
+	_.each(variableList, function(variable) {
+		variableTest += 'test-properties { test-' + variable.name + ': ' + variable.value + ';}\n';
+	});
 	sass.compile(variableTest, function(result) {
 		if(result.status !== 0) {
-			console.error('could not compile variable: ' + result.message);
+			console.error('could not compile variables: ' + result.message);
 			return;
 		}
 
-		var matches = result.text.match(/test-property: (.*);/);
-		callback(matches[1]);
-	});
+		_.each(variableList, function(variable) {
+			var matches = result.text.match(new RegExp('test-' + variable.name + ': (.*);'));
+			results[variable.name] = matches[1];
+		});
+		callback(results);
+	})
 }
 
 function isColor(value) {
