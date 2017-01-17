@@ -86,7 +86,7 @@ var editor;
 var variables = {};
 var currentUpdates = 0;
 
-var modifyVariable = _.throttle(_modifyVariable, 2000);
+var modifyVariable = _.debounce(_modifyVariable, 2000, {leading: true, trailing: true});
 
 $(document).ready(function() {
 	editor = ace.edit('editor');
@@ -111,18 +111,17 @@ $(document).ready(function() {
 					editor.getSession().setValue(content);
 					update();
 					parseCode();
-					editor.getSession().on('change', _.throttle(update, 2000));
 				});
 			});
 		}
 	);
 
-	$('#update_button').on('click', _.throttle(update, 2000));
+	$('#update_button').on('click', _.debounce(update, 2000, {leading: true, trailing: true}));
 	$('#editor_button').on('click', showEditor);
 	$('#easy_mode_button').on('click', showEasyMode);
 });
 
-function update(input) {
+function update() {
 	var code = editor.getSession().getValue();
 	if(currentUpdates === 0)
 		$('#update_indicator').addClass('fa-spin');
@@ -153,13 +152,17 @@ function update(input) {
 function showEditor() {
 	$('#easy_mode_container').hide();
 	$('#easy_mode_button').removeAttr('disabled');
+
 	$('#editor_container').show();
 	$('#editor_button').attr('disabled', true);
+	editor.getSession().on('change', _.debounce(update, 2000, {leading: true, trailing: true}));
 }
 
 function showEasyMode() {
 	$('#editor_container').hide();
 	$('#editor_button').removeAttr('disabled');
+	editor.getSession().removeAllListeners('change');
+
 	$('#easy_mode_container').show();
 	$('#easy_mode_button').attr('disabled', true);
 	parseCode();
