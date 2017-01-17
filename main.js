@@ -132,13 +132,18 @@ function update(input) {
 
 function showEditor() {
 	$('#easy_mode_container').hide();
+	$('#easy_mode_button').removeAttr('disabled');
 	$('#editor_container').show();
+	$('#editor_button').attr('disabled', true);
 }
 
 function showEasyMode() {
 	$('#editor_container').hide();
+	$('#editor_button').removeAttr('disabled');
 	$('#easy_mode_container').show();
+	$('#easy_mode_button').attr('disabled', true);
 	parseCode();
+	postUpdate();
 }
 
 function parseCode() {
