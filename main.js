@@ -84,8 +84,9 @@ var files = [
 
 var editor;
 var variables = {};
+var currentUpdates = 0;
 
-var modifyVariable = _.debounce(_modifyVariable, 2000, {leading: true, trailing: true});
+var modifyVariable = _.throttle(_modifyVariable, 2000);
 
 $(document).ready(function() {
 	editor = ace.edit('editor');
@@ -97,15 +98,24 @@ $(document).ready(function() {
 	editor.$blockScrolling = Infinity;
 
 	sass = new Sass(workerPath);
-	sass.options({indentedSyntax: false});
-	sass.preloadFiles(base, directory, files, function callback() {
-		sass.readFile('bootstrap/_variables.scss', function(content) {
-			editor.getSession().setValue(content);
-			update();
-			parseCode();
-			editor.getSession().on('change', _.throttle(update, 2000));
-		});
-	});
+	sass.options(
+		{
+			indentedSyntax: false,
+			precision: -1,
+			style: Sass.style.compact,
+			comments: false,
+		},
+		function() {
+			sass.preloadFiles(base, directory, files, function callback() {
+				sass.readFile('bootstrap/_variables.scss', function(content) {
+					editor.getSession().setValue(content);
+					update();
+					parseCode();
+					editor.getSession().on('change', _.throttle(update, 2000));
+				});
+			});
+		}
+	);
 
 	$('#update_button').on('click', _.throttle(update, 2000));
 	$('#editor_button').on('click', showEditor);
@@ -114,9 +124,15 @@ $(document).ready(function() {
 
 function update(input) {
 	var code = editor.getSession().getValue();
+	if(currentUpdates === 0)
+		$('#update_indicator').addClass('fa-spin');
+	currentUpdates++;
 	sass.writeFile('bootstrap/_variables.scss', code, function(success) {
 		if(!success) {
 			console.error('failed to write bootstrap/_variables.scss');
+			currentUpdates--;
+			if(currentUpdates === 0)
+				$('#update_indicator').removeClass('fa-spin');
 			return;
 		}
 
@@ -126,6 +142,10 @@ function update(input) {
 				postUpdate();
 			}
 			// TODO: Error highlighting?
+
+			currentUpdates--;
+			if(currentUpdates === 0)
+				$('#update_indicator').removeClass('fa-spin');
 		});
 	});
 }
