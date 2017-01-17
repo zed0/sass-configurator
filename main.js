@@ -200,7 +200,7 @@ function parseCode() {
 				'			<i></i>' +
 				'		</span>' +
 				'		<input type="hidden" id="' + makeId(variable.name) + '-color-input" class="color-input">\n' +
-				'		<input id="' + makeId(variable.name) + '" value="' + variable.value + '" data-varname="' + variable.name + '" type="text" class="form-control">\n' +
+				'		<input id="' + makeId(variable.name) + '" data-varname="' + variable.name + '" type="text" class="form-control">\n' +
 				'	</div>' +
 				'	' + (state.variableComment ? '<span class="help-block">' + state.variableComment + '</span>\n' : '') +
 				'</div>\n'
@@ -213,6 +213,7 @@ function parseCode() {
 	$('#easy_mode').html(html.join('\n'));
 
 	_.each(variables, function(variable) {
+		$('#' + makeId(variable.name)).val(variable.value);
 		$('#' + makeId(variable.name)).change(updateInput);
 	});
 }
@@ -283,6 +284,8 @@ function isColor(value) {
 	if(value === 'inherit')
 		return false;
 	if(value === 'transparent')
+		return false;
+	if(!isNaN(value))
 		return false;
 
 	var elem = document.createElement('span');
