@@ -217,7 +217,7 @@ function parseCode() {
 				'	</label>\n' +
 				'	<div id="' + makeId(variable.name) + '-color" class="input-group colorpicker-component" data-varname="' + variable.name + '">' +
 				'		<span class="input-group-addon" id="' + makeId(variable.name) + '-compiled">' +
-				'			<span class="fa fa-magic"></span>' +
+				'			<span class="fa fa-eye"></span>' +
 				'		</span>' +
 				'		<span class="input-group-addon color-swatch" style="display: none;">' +
 				'			<i></i>' +
