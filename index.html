@@ -11,6 +11,7 @@
 		<!-- installed via npm: -->
 		<script src="node_modules/sass.js/dist/sass.js"></script>
 		<script src="node_modules/marked/lib/marked.js"></script>
+		<script src="node_modules/file-saver/FileSaver.min.js"></script>
 		<script src="node_modules/bootstrap-colorpicker/dist/js/bootstrap-colorpicker.min.js"></script>
 		<link rel="stylesheet" href="node_modules/bootstrap-colorpicker/dist/css/bootstrap-colorpicker.min.css"></script>
 
@@ -38,25 +39,33 @@
 				</div>
 				<div class="navbar-form">
 					<span class="navbar-right">
-						<button
-							class="btn btn-default"
-							id="easy_mode_button"
-							disabled="true"
-						>
-							<i class="fa fa-th-list fa-fw"></i> Easy mode
-						</button>
-						<button
-							class="btn btn-default"
-							id="editor_button"
-						>
-							<i class="fa fa-file-code-o fa-fw"></i> Editor
-						</button>
+						<div class="btn-group" role="group">
+							<button
+								class="btn btn-default"
+								id="easy_mode_button"
+								disabled="true"
+							>
+								<i class="fa fa-th-list fa-fw"></i> Easy mode
+							</button>
+							<button
+								class="btn btn-default"
+								id="editor_button"
+							>
+								<i class="fa fa-file-code-o fa-fw"></i> Editor
+							</button>
+						</div>
 						<button
 							class="btn btn-default"
 							id="update_button"
 							title="The page should automatically update when you make changes.  If it doesn't you can click here."
 						>
 							<i id="update_indicator" class="fa fa-refresh fa-fw"></i> Update
+						</button>
+						<button
+							class="btn btn-default"
+							id="save_button"
+						>
+							<i class="fa fa-download"></i>Download
 						</button>
 						<a
 							class="btn btn-default"

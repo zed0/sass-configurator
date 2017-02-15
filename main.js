@@ -34,6 +34,7 @@ $(document).ready(function() {
 	);
 
 	$('#update_button').on('click', _.debounce(compileAll, 2000, {leading: true, trailing: true}));
+	$('#save_button').on('click', save);
 	$('#editor_button').on('click', showEditor);
 	$('#easy_mode_button').on('click', showEasyMode);
 });
@@ -80,14 +81,14 @@ function sectionsToText(sections) {
 			return section.variables.length
 		})
 		.map(sectionToText)
-		.join('\n');
+		.join('\n\n');
 
 	return text;
 }
 
 function sectionToText(section) {
 	var text = '';
-	if(section.heading) text += '\n//# ' + section.heading + '\n';
+	if(section.heading) text += '//== ' + section.heading + '\n';
 	if(section.description) text += '//## ' + section.description + '\n';
 	text += _(section.variables)
 		.map(function(variable){return variableToText(variable, true);})
@@ -442,4 +443,10 @@ function isColor(value) {
 		return true;
 
 	return false;
+}
+
+function save() {
+	var code = editor.getSession().getValue();
+	var blob = new Blob([code], {type: 'text/plain;charset=utf-8'});
+	saveAs(blob, 'custom.scss');
 }
