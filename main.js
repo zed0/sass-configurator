@@ -52,23 +52,24 @@ function loadFiles(callback) {
 	fullFileList.push(variablesFile);
 
 	sass.preloadFiles(base, '', fullFileList, function() {
-		sass.readFile(customizerFile, function(customizerContent) {
-			if(customizerContent != '') {
-				throw new Error('using an existing customizerFile is not currently supported');
-				//callback(customizerContent);
-			}
-			else {
-				sass.readFile(variablesFile, function(variablesContent) {
-					var sections = getVariablesFromText(variablesContent);
-					var customizerContent = sectionsToText(sections);
+		sass.readFile(variablesFile, function(variablesContent) {
+			var sections = getVariablesFromVariablesFile(variablesContent);
 
+			sass.readFile(customizerFile, function(customizerContent) {
+				if(customizerContent != '') {
+					updateVariablesFromCustomizerFile(sections, customizerContent);
+					callback(customizerContent, sections);
+				}
+				else {
+					customizerContent = sectionsToText(sections);
 					sass.writeFile(customizerFile, customizerContent, function(success) {
 						if(!success)
 							throw new Error('could not write ' + customizerFile);
+						updateVariablesFromCustomizerFile(sections, customizerContent);
 						callback(customizerContent, sections);
 					});
-				});
-			}
+				}
+			});
 		});
 	});
 }
@@ -89,21 +90,30 @@ function sectionToText(section) {
 	if(section.heading) text += '\n//# ' + section.heading + '\n';
 	if(section.description) text += '//## ' + section.description + '\n';
 	text += _(section.variables)
-		.map(variableToText)
+		.map(function(variable){return variableToText(variable, true);})
 		.join('\n');
 
 	return text;
 }
 
-function variableToText(variable) {
+function variableToText(variable, includeComments) {
 	var text = '';
-	if(variable.comment) text += '//** ' + variable.comment + '\n';
+
+	if(variable.comment && includeComments)
+		text += '//** ' + variable.comment + '\n';
+
 	text += variable.lineStart;
+
 	if(variable.value)
 		text += variable.value;
 	else
 		text += 'null'
-	text += '; //Default: ' + variable.defaultValue;
+
+	if(variable.lineEnd)
+		text += variable.lineEnd;
+	else
+		text += '; //Default: ' + variable.defaultValue;
+
 	return text;
 }
 
@@ -157,12 +167,43 @@ function showEasyMode() {
 
 	$('#easy_mode_container').show();
 	$('#easy_mode_button').attr('disabled', true);
-	//TODO
-	//parseCode(editor.getSession().getValue());
-	//postUpdate();
+	updateVariablesFromCustomizerFile(currentSections, editor.getSession().getValue());
+
+	_.each(getVariables(currentSections), function(variable) {
+		$('#' + makeId(variable.name)).val(variable.value || variable.defaultValue);
+	})
 }
 
-function getVariablesFromText(text) {
+function updateVariablesFromCustomizerFile(sections, text) {
+	var variables = getVariables(sections);
+
+	_(text)
+	.split('\n')
+	.each(function(line, lineNo) {
+		var match;
+		if(match = line.match(/^(\$([^:]+):(\s*))([^;]*)(;.*)$/)) {
+			var name = match[2];
+			var currentVariable = _.find(variables, function(variable){
+				return variable.name === name;
+			});
+
+			if(!currentVariable)
+				return;
+
+			currentVariable.customLineNo = lineNo;
+			currentVariable.lineEnd      = match[5];
+
+			if(match[4] == 'null')
+				return;
+
+			currentVariable.value        = match[4];
+			currentVariable.modified     = true;
+		}
+	})
+	.value();
+}
+
+function getVariablesFromVariablesFile(text) {
 	var defaultSection = {
 		heading:     'Misc',
 		description: null,
@@ -202,18 +243,19 @@ function getVariablesFromText(text) {
 		else if(match = line.match(/^\/\/\*\* (.*$)/)) {
 			state.variableComment = match[1];
 		}
-		else if(match = line.match(/^(\$([^:]+):(\s*))([^;]*)( !default;)/)) {
+		else if(match = line.match(/^(\$([^:]+):(\s*))([^;]*) !default;/)) {
 			var variable = {
-				lineNo:       lineNo,
-				lineStart:    match[1],
-				name:         match[2],
-				spacing:      match[3],
-				defaultValue: match[4],
-				lineEnd:      match[5],
-				modified:     false,
-				section:      _.last(sections).heading,
-				comment:      state.variableComment,
-				value:        undefined,
+				variableLineNo: lineNo,
+				customLineNo:   undefined,
+				lineStart:      match[1],
+				name:           match[2],
+				spacing:        match[3],
+				defaultValue:   match[4],
+				lineEnd:        undefined,
+				modified:       false,
+				section:        _.last(sections).heading,
+				comment:        state.variableComment,
+				value:          undefined,
 			};
 
 			_.last(sections).variables.push(variable);
@@ -341,7 +383,7 @@ function _modifyVariable(value, variable) {
 	variable.modified = true;
 
 	var codeLines = editor.getSession().getValue().split('\n');
-	codeLines[variable.lineNo] = variableToText(variable);
+	codeLines[variable.customLineNo] = variableToText(variable, false);
 	editor.getSession().setValue(codeLines.join('\n'));
 
 	compileAll();
@@ -357,10 +399,8 @@ function compileVariables(variableList, callback) {
 		variableTest += 'test-properties { test-' + variable.name + ': $' + variable.name + ';}\n';
 	});
 	sass.compile(variableTest, function(result) {
-		if(result.status !== 0) {
-			console.error('could not compile variables: ' + result.message);
-			return;
-		}
+		if(result.status !== 0)
+			throw new Error('could not compile variables: ' + result.message);
 
 		_.each(variableList, function(variable) {
 			var matches = result.text.match(new RegExp('test-' + variable.name + ': (.*);'));
