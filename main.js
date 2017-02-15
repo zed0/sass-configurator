@@ -277,6 +277,7 @@ function createEasyMode(sections) {
 	_.each(getVariables(sections), function(variable) {
 		$('#' + makeId(variable.name)).val(variable.value || variable.defaultValue);
 		$('#' + makeId(variable.name)).change(updateInput);
+		$('#' + makeId(variable.name) + '-reset').on('click', resetInput);
 	})
 }
 
@@ -326,6 +327,17 @@ function variableToHtml(variable) {
 		'		</span>' +
 		'		<input type="hidden" id="' + makeId(variable.name) + '-color-input" class="color-input">\n' +
 		'		<input id="' + makeId(variable.name) + '" data-varname="' + variable.name + '" type="text" class="form-control">\n' +
+		'		<span class="input-group-btn">' +
+		'			<button' +
+		'				id="' + makeId(variable.name) + '-reset"' +
+		'				data-varname="' + variable.name + '"' +
+		'				class="btn btn-default"' +
+		'				type="button"' +
+		'				title="Reset to default (' + _.escape(variable.defaultValue) + ')"' +
+		'			>' +
+		'				<i class="fa fa-undo"></i>' +
+		'			</button>' +
+		'		</span>' +
 		'	</div>' +
 		'	' + (variable.comment ? '<span class="help-block">' + marked(variable.comment) + '</span>\n' : '') +
 		'</div>\n';
@@ -376,14 +388,38 @@ function updateColor(e) {
 }
 
 function updateInput() {
-	var value = $(this).val();
 	var variable = getVariable(currentSections, $(this).data('varname'));
-	var colorPicker = $('#' + makeId(variable.name) + '-color');
-	// We temporarily remove the handler so that updateColor doesn't get fired
-	colorPicker.off('changeColor');
-	colorPicker.colorpicker('setValue', value);
-	colorPicker.on('changeColor', updateColor);
+	var value = $(this).val();
+	if(isColor(value)) {
+		var colorPicker = $('#' + makeId(variable.name) + '-color');
+		// We temporarily remove the handler so that updateColor doesn't get fired
+		colorPicker.off('changeColor');
+		colorPicker.colorpicker('setValue', value);
+		colorPicker.on('changeColor', updateColor);
+	}
 	modifyVariable(value, variable);
+}
+
+function resetInput() {
+	var variable = getVariable(currentSections, $(this).data('varname'));
+	var value = variable.defaultValue;
+	$('#' + makeId(variable.name)).val(value);
+	if(isColor(value)) {
+		var colorPicker = $('#' + makeId(variable.name) + '-color');
+		// We temporarily remove the handler so that updateColor doesn't get fired
+		colorPicker.off('changeColor');
+		colorPicker.colorpicker('setValue', value);
+		colorPicker.on('changeColor', updateColor);
+	}
+
+	variable.value = undefined;
+	variable.modified = false;
+
+	var codeLines = editor.getSession().getValue().split('\n');
+	codeLines[variable.customLineNo] = variableToText(variable, false);
+	editor.getSession().setValue(codeLines.join('\n'));
+
+	compileAll();
 }
 
 function _modifyVariable(value, variable) {
