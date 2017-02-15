@@ -1,4 +1,6 @@
-//Base file to compile
+// Should we filter out variables that have not been changed from the text
+var filterDefault = false;
+// Base file to compile
 var baseFile       = 'base.scss';
 // Name of the file to customize, this file should exist, however if it is a blank file its content will be populated by variables available in variablesFile
 var customizerFile = '_custom.scss';

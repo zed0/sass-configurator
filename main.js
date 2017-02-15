@@ -5,7 +5,7 @@ var base = '../../../';
 
 var sass;
 var editor;
-var variables = {};
+var currentSections = [];
 var currentUpdates = 0;
 
 var modifyVariable = _.debounce(_modifyVariable, 2000, {leading: true, trailing: true});
@@ -33,15 +33,16 @@ $(document).ready(function() {
 		}
 	);
 
-	$('#update_button').on('click', _.debounce(update, 2000, {leading: true, trailing: true}));
+	$('#update_button').on('click', _.debounce(compileAll, 2000, {leading: true, trailing: true}));
 	$('#editor_button').on('click', showEditor);
 	$('#easy_mode_button').on('click', showEasyMode);
 });
 
-function setupWithContent(customizerContent) {
-	parseCode(customizerContent);
+function setupWithContent(customizerContent, sections) {
 	editor.getSession().setValue(customizerContent);
-	update();
+	createEasyMode(sections);
+	currentSections = sections;
+	compileAll();
 }
 
 function loadFiles(callback) {
@@ -53,14 +54,18 @@ function loadFiles(callback) {
 	sass.preloadFiles(base, '', fullFileList, function() {
 		sass.readFile(customizerFile, function(customizerContent) {
 			if(customizerContent != '') {
-				callback(customizerContent);
+				throw new Error('using an existing customizerFile is not currently supported');
+				//callback(customizerContent);
 			}
 			else {
 				sass.readFile(variablesFile, function(variablesContent) {
-					sass.writeFile(customizerFile, variablesContent, function(success) {
+					var sections = getVariablesFromText(variablesContent);
+					var customizerContent = sectionsToText(sections);
+
+					sass.writeFile(customizerFile, customizerContent, function(success) {
 						if(!success)
 							throw new Error('could not write ' + customizerFile);
-						callback(variablesContent);
+						callback(customizerContent, sections);
 					});
 				});
 			}
@@ -68,30 +73,69 @@ function loadFiles(callback) {
 	});
 }
 
-function update() {
-	var code = editor.getSession().getValue();
+function sectionsToText(sections) {
+	var text = _(sections)
+		.filter(function(section) {
+			return section.variables.length
+		})
+		.map(sectionToText)
+		.join('\n');
+
+	return text;
+}
+
+function sectionToText(section) {
+	var text = '';
+	if(section.heading) text += '\n//# ' + section.heading + '\n';
+	if(section.description) text += '//## ' + section.description + '\n';
+	text += _(section.variables)
+		.map(variableToText)
+		.join('\n');
+
+	return text;
+}
+
+function variableToText(variable) {
+	var text = '';
+	if(variable.comment) text += '//** ' + variable.comment + '\n';
+	text += variable.lineStart;
+	if(variable.value)
+		text += variable.value;
+	else
+		text += 'null'
+	text += '; //Default: ' + variable.defaultValue;
+	return text;
+}
+
+function startUpdate() {
 	if(currentUpdates === 0)
 		$('#update_indicator').addClass('fa-spin');
 	currentUpdates++;
+}
+
+function finishUpdate() {
+	currentUpdates--;
+	if(currentUpdates === 0)
+		$('#update_indicator').removeClass('fa-spin');
+}
+
+function compileAll() {
+	var code = editor.getSession().getValue();
+	startUpdate();
 	sass.writeFile(customizerFile, code, function(success) {
 		if(!success) {
-			console.error('failed to write ' + customizerFile);
-			currentUpdates--;
-			if(currentUpdates === 0)
-				$('#update_indicator').removeClass('fa-spin');
-			return;
+			finishUpdate();
+			throw new Error('failed to write ' + customizerFile);
 		}
 
 		sass.compileFile(baseFile, function(result) {
-			if(result.status === 0) {
-				window.frames['preview'].contentDocument.getElementById('compiled_sass').innerHTML = result.text;
-				postUpdate();
-			}
+			finishUpdate();
 			// TODO: Error highlighting?
+			if(result.status !== 0)
+				throw new Error('compilation failed!');
 
-			currentUpdates--;
-			if(currentUpdates === 0)
-				$('#update_indicator').removeClass('fa-spin');
+			window.frames['preview'].contentDocument.getElementById('compiled_sass').innerHTML = result.text;
+			postUpdate();
 		});
 	});
 }
@@ -102,7 +146,8 @@ function showEditor() {
 
 	$('#editor_container').show();
 	$('#editor_button').attr('disabled', true);
-	editor.getSession().on('change', _.debounce(update, 2000, {leading: true, trailing: true}));
+	editor.resize();
+	editor.getSession().on('change', _.debounce(compileAll, 2000, {leading: true, trailing: true}));
 }
 
 function showEasyMode() {
@@ -112,98 +157,160 @@ function showEasyMode() {
 
 	$('#easy_mode_container').show();
 	$('#easy_mode_button').attr('disabled', true);
-	parseCode(editor.getSession().getValue());
-	postUpdate();
+	//TODO
+	//parseCode(editor.getSession().getValue());
+	//postUpdate();
 }
 
-function parseCode(code) {
+function getVariablesFromText(text) {
+	var defaultSection = {
+		heading:     'Misc',
+		description: null,
+		variables:   [],
+	};
+
 	var state = {
 		ignoring: false,
 		variableComment: null,
+		section: null,
 	};
 
-	var html = [];
-	_(code)
+	var sections = [_.cloneDeep(defaultSection)];
+
+	_(text)
 	.split('\n')
 	.each(function(line, lineNo) {
 		var match;
 		if(match = line.match(/^\/\/== (.*$)/)) {
+			var section = _.cloneDeep(defaultSection);
+			section.heading = match[1];
+			sections.push(section);
 			state.ignoring = false;
-			html.push(marked('# ' + match[1]));
 		}
 		else if(state.ignoring) {
 			return;
 		}
+		//TODO
+		/*
 		else if(match = line.match(/^\/\/=== (.*$)/)) {
-			html.push(marked('## ' + match[1]));
+			//html.push(marked('## ' + match[1]));
 		}
+		*/
 		else if(match = line.match(/^\/\/## (.*$)/)) {
-			html.push(marked(match[1]));
+			_.last(sections).description = match[1];
 		}
 		else if(match = line.match(/^\/\/\*\* (.*$)/)) {
-			state.variableComment = marked(match[1]);
+			state.variableComment = match[1];
 		}
 		else if(match = line.match(/^(\$([^:]+):(\s*))([^;]*)( !default;)/)) {
 			var variable = {
-				lineNo:    lineNo,
-				lineStart: match[1],
-				name:      match[2],
-				spacing:   match[3],
-				value:     match[4],
-				lineEnd:   match[5],
-				modified:  false,
+				lineNo:       lineNo,
+				lineStart:    match[1],
+				name:         match[2],
+				spacing:      match[3],
+				defaultValue: match[4],
+				lineEnd:      match[5],
+				modified:     false,
+				section:      _.last(sections).heading,
+				comment:      state.variableComment,
+				value:        undefined,
 			};
 
-			variables[match[2]] = variable;
+			_.last(sections).variables.push(variable);
 
-			html.push(
-				'<div class="form-group">\n' +
-				'	<label for="' + makeId(variable.name) + '" class="control-label">\n' +
-				'		$' + variable.name + '\n' +
-				'	</label>\n' +
-				'	<div id="' + makeId(variable.name) + '-color" class="input-group colorpicker-component" data-varname="' + variable.name + '">' +
-				'		<span class="input-group-addon" id="' + makeId(variable.name) + '-compiled">' +
-				'			<span class="fa fa-eye"></span>' +
-				'		</span>' +
-				'		<span class="input-group-addon color-swatch" style="display: none;">' +
-				'			<i></i>' +
-				'		</span>' +
-				'		<input type="hidden" id="' + makeId(variable.name) + '-color-input" class="color-input">\n' +
-				'		<input id="' + makeId(variable.name) + '" data-varname="' + variable.name + '" type="text" class="form-control">\n' +
-				'	</div>' +
-				'	' + (state.variableComment ? '<span class="help-block">' + state.variableComment + '</span>\n' : '') +
-				'</div>\n'
-			);
 			state.variableComment = null;
 		}
 	})
 	.value();
 
-	$('#easy_mode').html(html.join('\n'));
+	return sections;
+}
 
-	_.each(variables, function(variable) {
-		$('#' + makeId(variable.name)).val(variable.value);
+function createEasyMode(sections) {
+	var html = sectionsToHtml(sections);
+
+	$('#easy_mode').html(html);
+
+	_.each(getVariables(sections), function(variable) {
+		$('#' + makeId(variable.name)).val(variable.value || variable.defaultValue);
 		$('#' + makeId(variable.name)).change(updateInput);
+	})
+}
+
+function getVariables(sections) {
+	return _(sections)
+		.map('variables')
+		.flatten()
+		.value();
+}
+
+function getVariable(sections, name) {
+	return _.find(getVariables(sections), function(variable) {
+		return variable.name === name;
 	});
 }
 
-function postUpdate() {
-	compileVariables(variables, function(results) {
-		_.each(results, function(compiled, name) {
-			$('#' + makeId(name) + '-compiled').attr('title', compiled);
-			if(isColor(compiled)) {
-				var colorPicker = $('#' + makeId(name) + '-color');
-				colorPicker.find('.color-swatch').show();
-				colorPicker.colorpicker({
-					component: '.color-swatch',
-					input:     '.color-input',
-					align:     'left',
-					color:     compiled,
-				})
-				.on('changeColor', updateColor);
-			}
-		});
+function sectionsToHtml(sections) {
+	return _(sections)
+		.map(sectionToHtml)
+		.join('\n');
+}
 
+function sectionToHtml(section) {
+	var html = '';
+	if(section.variables.length) {
+		if(section.heading)     html += marked('# ' + section.heading);
+		if(section.description) html += marked(section.description);
+		html += _(section.variables)
+			.map(variableToHtml)
+			.join('\n');
+	}
+	return html;
+}
+
+function variableToHtml(variable) {
+	var text =
+		'<div class="form-group">\n' +
+		'	<label for="' + makeId(variable.name) + '" class="control-label">\n' +
+		'		$' + variable.name + '\n' +
+		'	</label>\n' +
+		'	<div id="' + makeId(variable.name) + '-color" class="input-group colorpicker-component" data-varname="' + variable.name + '">' +
+		'		<span class="input-group-addon" id="' + makeId(variable.name) + '-compiled">' +
+		'			<span class="fa fa-eye"></span>' +
+		'		</span>' +
+		'		<span class="input-group-addon color-swatch" style="display: none;">' +
+		'			<i></i>' +
+		'		</span>' +
+		'		<input type="hidden" id="' + makeId(variable.name) + '-color-input" class="color-input">\n' +
+		'		<input id="' + makeId(variable.name) + '" data-varname="' + variable.name + '" type="text" class="form-control">\n' +
+		'	</div>' +
+		'	' + (variable.comment ? '<span class="help-block">' + marked(variable.comment) + '</span>\n' : '') +
+		'</div>\n';
+	return text;
+}
+
+function postUpdate() {
+	var addInputs = function(compiled, name) {
+		$('#' + makeId(name) + '-compiled').attr('title', compiled);
+
+		if(isColor(compiled))
+			createSwatch(name, compiled);
+	};
+
+	var createSwatch = function(name, color) {
+		var colorPicker = $('#' + makeId(name) + '-color');
+		colorPicker.find('.color-swatch').show();
+		colorPicker.colorpicker({
+			component: '.color-swatch',
+			input:     '.color-input',
+			align:     'left',
+			color:     color,
+		})
+		.on('changeColor', updateColor);
+	};
+
+	compileVariables(getVariables(currentSections), function(results) {
+		_.each(results, addInputs);
 	});
 }
 
@@ -213,14 +320,19 @@ function makeId(variableName) {
 
 function updateColor(e) {
 	var value = e.color.toString('hex');
-	var variable = variables[$(e.target).data('varname')];
+	var variable = getVariable(currentSections, $(e.target).data('varname'));
 	$('#' + makeId(variable.name)).val(value);
 	modifyVariable(value, variable);
 }
 
 function updateInput() {
 	var value = $(this).val();
-	var variable = variables[$(this).data('varname')];
+	var variable = getVariable(currentSections, $(this).data('varname'));
+	var colorPicker = $('#' + makeId(variable.name) + '-color');
+	// We temporarily remove the handler so that updateColor doesn't get fired
+	colorPicker.off('changeColor');
+	colorPicker.colorpicker('setValue', value);
+	colorPicker.on('changeColor', updateColor);
 	modifyVariable(value, variable);
 }
 
@@ -229,11 +341,10 @@ function _modifyVariable(value, variable) {
 	variable.modified = true;
 
 	var codeLines = editor.getSession().getValue().split('\n');
-	codeLines[variable.lineNo] = variable.lineStart + variable.value + variable.lineEnd;
-
+	codeLines[variable.lineNo] = variableToText(variable);
 	editor.getSession().setValue(codeLines.join('\n'));
 
-	update();
+	compileAll();
 }
 
 function compileVariables(variableList, callback) {
@@ -243,7 +354,7 @@ function compileVariables(variableList, callback) {
 	variableTest += '@import "' + customizerFile + '";\n';
 	variableTest += '@import "' + variablesFile + '";\n';
 	_.each(variableList, function(variable) {
-		variableTest += 'test-properties { test-' + variable.name + ': ' + variable.value + ';}\n';
+		variableTest += 'test-properties { test-' + variable.name + ': $' + variable.name + ';}\n';
 	});
 	sass.compile(variableTest, function(result) {
 		if(result.status !== 0) {
