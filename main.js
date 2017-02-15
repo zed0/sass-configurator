@@ -341,14 +341,21 @@ function postUpdate() {
 
 	var createSwatch = function(name, color) {
 		var colorPicker = $('#' + makeId(name) + '-color');
-		colorPicker.find('.color-swatch').show();
-		colorPicker.colorpicker({
-			component: '.color-swatch',
-			input:     '.color-input',
-			align:     'left',
-			color:     color,
-		})
-		.on('changeColor', updateColor);
+		if(!colorPicker.data('colorpicker')) {
+			colorPicker.find('.color-swatch').show();
+			colorPicker.colorpicker({
+				component: '.color-swatch',
+				input:     '.color-input',
+				align:     'left',
+				color:     color,
+			})
+			.on('changeColor', updateColor);
+		}
+		else {
+			colorPicker.off('changeColor');
+			colorPicker.colorpicker('setValue', color);
+			colorPicker.on('changeColor', updateColor);
+		}
 	};
 
 	compileVariables(getVariables(currentSections), function(results) {
